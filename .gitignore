@@ -31,3 +31,5 @@ Thumbs.db
 .pixi/*
 !.pixi/config.toml
 .Rproj.user
+test_input/
+test_results/
