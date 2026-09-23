@@ -125,8 +125,7 @@ main <- function() {
   fwrite(data.frame(name = args$name, solver = args$solver, random_seed = args$random_seed, n_components = args$n_components, n_iter = args$n_iter,
       n_oversamples = args$n_oversamples, num_threads = args$num_threads, pca_start = format(pca_start, "%Y-%m-%dT%H:%M:%OS3%z"),
       pca_end = format(pca_end, "%Y-%m-%dT%H:%M:%OS3%z"), runtime_s = pca_runtime_s), out_runtime_csv)
-  cat(sprintf("  wrote: %s\n", out_runtime_csv))
-}
+  cat(sprintf("  wrote: %s\n", out_runtime_csv))}
 
 if (sys.nframe() == 0L) {
   main()
