@@ -15,6 +15,7 @@ suppressPackageStartupMessages({
   library(HDF5Array)
   library(scrapper)
   library(BiocSingular)
+  library(BiocParallel)
   library(data.table)
 })
 
@@ -26,8 +27,17 @@ p <- add_stage_args(p, "PCA")     # the stage I/O contract
 # your own method params — argparser directly (its add_argument requires `help`):
 p <- add_argument(p, "--solver", type = "character", help = "name of solver")
 p <- add_argument(p, "--n_components", type = "integer", help = "number of PCs")
+p <- add_argument(p, "--n_iter", type = "integer", default = 2L, help = "number of power iterations for randomized SVD")
+p <- add_argument(p, "--n_oversamples", type = "integer", default = 10L, help = "number of oversamples for randomized SVD")
+p <- add_argument(p, "--num_threads", type = "integer", default = 1L, help = "number of compute threads/workers")
 p <- add_argument(p, "--random_seed", type = "integer", help = "seed")
 args <- parse_args(p)                    # argparser's own parser
+
+#thread control
+make_bpparam <- function(n_threads) {
+  if (n_threads < 1L) {stop("--num_threads must be >= 1")}
+  if (n_threads == 1L) {SerialParam()} else if (.Platform$OS.type == "unix") {MulticoreParam(workers = n_threads, progressbar = FALSE)}
+  else {SnowParam(workers = n_threads, progressbar = FALSE)}}
 
 # logging
 cat(sprintf("Full command: %s\n", paste(commandArgs(trailingOnly = FALSE), collapse = " ")))
@@ -43,7 +53,7 @@ run_pca <- function(X, args) {
   set.seed(args$random_seed)
 
   if (args$solver == "irlba") {
-    pca <- runPca(X, number = args$n_components, num.threads = 1L)
+    pca <- runPca(X, number = args$n_components, num.threads = args$num_threads)
     # scrapper::runPca returns components (n_components x n_cells), rotation (n_genes x n_components)
     embedding <- t(pca$components)
     loadings  <- pca$rotation
@@ -52,7 +62,7 @@ run_pca <- function(X, args) {
   } else {
     # random / exact via BiocSingular::runSVD on the transposed (cells x genes) matrix
     bsparam <- switch(args$solver,
-      random = RandomParam(),
+      random = RandomParam(p = args$n_oversamples, q = args$n_iter),
       exact  = ExactParam(),
       stop("unknown solver: ", args$solver)
     )
@@ -91,8 +101,12 @@ main <- function() {
   m <- TENxMatrix(args$normalized_selected_h5, group = "matrix")
   m <- as(m, "dgCMatrix")
   cat(sprintf("  matrix (genes x cells): %d x %d\n", nrow(m), ncol(m)))
-
+# runtime recirding 
+  pca_start <- Sys.time()
   res <- run_pca(m, args)
+  pca_end <- Sys.time()
+  pca_runtime_s <- as.numeric(difftime(pca_end, pca_start, units = "secs"))
+  cat(sprintf("  PCA runtime: %.6f seconds\n", pca_runtime_s))
   cat(sprintf("  embedding: %d x %d, loadings: %d x %d\n",
     nrow(res$embedding), ncol(res$embedding),
     nrow(res$loadings),  ncol(res$loadings)))
@@ -106,6 +120,12 @@ main <- function() {
   fwrite(data.frame(gene = rownames(res$loadings), res$loadings), out_loadings_tsv,
     sep = "\t", quote = FALSE, row.names = FALSE)
   cat(sprintf("  wrote: %s\n", out_loadings_tsv))
+#save runtime 
+  out_runtime_csv <- file.path(args$output_dir, sprintf("%s_runtime.csv", args$name))
+  fwrite(data.frame(name = args$name, solver = args$solver, random_seed = args$random_seed, n_components = args$n_components, n_iter = args$n_iter,
+      n_oversamples = args$n_oversamples, num_threads = args$num_threads, pca_start = format(pca_start, "%Y-%m-%dT%H:%M:%OS3%z"),
+      pca_end = format(pca_end, "%Y-%m-%dT%H:%M:%OS3%z"), runtime_s = pca_runtime_s), out_runtime_csv)
+  cat(sprintf("  wrote: %s\n", out_runtime_csv))
 }
 
 if (sys.nframe() == 0L) {
