@@ -31,5 +31,13 @@ Thumbs.db
 .pixi/*
 !.pixi/config.toml
 .Rproj.user
+
+# tests 
+test_metrics/
 test_input/
 test_results/
+
+# outputs 
+*.csv
+*.tsv
+figures/
