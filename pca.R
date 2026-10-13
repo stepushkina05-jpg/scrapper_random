@@ -52,8 +52,11 @@ run_pca <- function(X, args) {
   # X: gene-by-cell sparse matrix (rows = genes).
   set.seed(args$random_seed)
 
+  
   if (args$solver == "irlba") {
-    pca <- runPca(X, number = args$n_components, num.threads = args$num_threads)
+    pca <- runPca(X, number = args$n_components, iterations = args$n_iter, extra.work = args$n_oversamples,
+    seed = args$random_seed, realized = TRUE, num.threads = args$num_threads
+)
     # scrapper::runPca returns components (n_components x n_cells), rotation (n_genes x n_components)
     embedding <- t(pca$components)
     loadings  <- pca$rotation
