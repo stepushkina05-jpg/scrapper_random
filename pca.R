@@ -7,17 +7,18 @@
 # Implementations:
 #   - irlba:  scrapper::runPca() using implicitly restarted Lanczos bidiagonalization.
 #   - random: BiocSingular::runSVD() using randomized SVD.
-#   - exact:  BiocSingular::runSVD() using exact SVD.
+#
 #
 # Preprocessing:
 #   PCA is performed on centered, unscaled expression data.
 #
-# Parameters:
-#   n_components:  Number of principal components.
-#   n_iter:        Maximum restart iterations (IRLBA) or power iterations (randomized SVD).
-#   n_oversamples: Additional working dimensions (IRLBA) or oversampling vectors (randomized SVD).
-#   random_seed:   Random initialization seed.
-#   num_threads:   Number of compute threads.
+# Parameter mapping for the two PCA solvers:
+# - IRLBA (scrapper::runPca):
+#     n_iter -> iterations (maximum Lanczos restart iterations)
+#     n_oversamples -> extra.work (additional working-subspace dimensions)
+# - Randomized SVD (BiocSingular::runSVD):
+#     n_iter -> q (number of power iterations)
+#     n_oversamples -> p (number of oversampling vectors)
 #
 # Outputs:
 #   - <name>_pcas.tsv:     PC scores (cells x components).
