@@ -1,15 +1,30 @@
 #!/usr/bin/env Rscript
-# PCA module (scrapper-backed) for omnibenchmark.
+# PCA module for Omnibenchmark using scrapper and BiocSingular.
 #
-# Output format: see docs/pca_output.md (neutral HDF5, format_version "1").
+# Input:
+#   Normalized, HVG-selected HDF5 matrix (genes x cells).
 #
-# Implementation notes
-# --------------------
-# - scrapper::runPca operates on the gene-by-cell matrix directly (it
-#   internally centers/scales rows). No explicit scale step here.
-# - Subsetting to selected genes happens here for now; this responsibility
-#   should move to a dedicated upstream cleanup stage. See load_subset_matrix.
-
+# Implementations:
+#   - irlba:  scrapper::runPca() using implicitly restarted Lanczos bidiagonalization.
+#   - random: BiocSingular::runSVD() using randomized SVD.
+#   - exact:  BiocSingular::runSVD() using exact SVD.
+#
+# Preprocessing:
+#   PCA is performed on centered, unscaled expression data.
+#
+# Parameters:
+#   n_components:  Number of principal components.
+#   n_iter:        Maximum restart iterations (IRLBA) or power iterations (randomized SVD).
+#   n_oversamples: Additional working dimensions (IRLBA) or oversampling vectors (randomized SVD).
+#   random_seed:   Random initialization seed.
+#   num_threads:   Number of compute threads.
+#
+# Outputs:
+#   - <name>_pcas.tsv:     PC scores (cells x components).
+#   - <name>_loadings.tsv: PC loadings (genes x components).
+#   - <name>_runtime.csv:  PCA runtime and execution parameters.
+#
+# The module preserves cell and gene identifiers for downstream comparisons.
 suppressPackageStartupMessages({
   library(Matrix)
   library(HDF5Array)
@@ -52,11 +67,8 @@ run_pca <- function(X, args) {
   # X: gene-by-cell sparse matrix (rows = genes).
   set.seed(args$random_seed)
 
-  
   if (args$solver == "irlba") {
-    pca <- runPca(X, number = args$n_components, iterations = args$n_iter, extra.work = args$n_oversamples,
-    seed = args$random_seed, realized = TRUE, num.threads = args$num_threads
-)
+    pca <- runPca(X, number = args$n_components, num.threads = args$num_threads)
     # scrapper::runPca returns components (n_components x n_cells), rotation (n_genes x n_components)
     embedding <- t(pca$components)
     loadings  <- pca$rotation
